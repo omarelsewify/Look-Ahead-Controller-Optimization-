@@ -9,7 +9,7 @@
 \usepackage{longtable,tabularx}
 \setlength\LTleft{0pt} 
 
-\title{Optimization of PID controller gains for simulation of autonomous vehicle path-tracking}
+\title{Optimization of Look-Ahead controller gains for simulation of autonomous vehicle path-tracking}
 
 \author{O. Elsewify\footnote{Master's Student, Mechanical Engineering, 440 Escondido Mall Building 530, Stanford, CA 94305} and A. Mhish\footnote{Master's Student, Mechanical Engineering, 440 Escondido Mall Building 530, Stanford, CA 94305}}
 \affil{Stanford University, Stanford, CA, 94305}
@@ -19,7 +19,7 @@
 \maketitle
 
 \begin{abstract}
-In this paper a design approach is presented for the optimization of the controller gains of a Proportional Integral and Derivative (PID) controller. When implemented, the resulting controller must ensure that the system can follow a fixed trajectory, at a desired speed profile, within a set range of lateral and longitudinal accelerations. The problem is a multi variable optimization problem, with three controller gains as the desired output.
+In this paper a design approach is presented for the optimization of the controller gains of a Look-ahead controller for an autonomous vehicle. When implemented, the resulting controller must ensure that the system can follow a fixed trajectory, at a desired speed profile, within a set range of lateral and longitudinal accelerations. The problem is a multi variable optimization problem, with three controller gains as the desired output.
 Several optimization approaches are considered and performance of the algorithms are evaluated and compared.
 \end{abstract}
 
@@ -27,9 +27,9 @@ Several optimization approaches are considered and performance of the algorithms
 
 {\renewcommand\arraystretch{1.0}
 \noindent\begin{longtable*}{@{}l @{\quad=\quad} l@{}}
-$K_p$  & proportional gain \\
-$K_i$ &   integral gain \\
-$K_d$& derivative gain \\
+$K_{LA}$ & look-ahead gain \\
+$x_{LA}$ & look-ahead distance (m)\\
+$K_{long}$& longitudinal gain \\
 $x$ & design variable \\
 $f$ & general function \\
 $f_{obj}$   & objective function\\
@@ -37,18 +37,41 @@ $c$  & constraints \\
 $\alpha$ & step size\\
 $\rho$   & initial penalty \\
 $\gamma$ & penalty multiplier\\
-$e$ & lateral error at CG \\
-$U_x$ & longitudinal component of vehicle velocity \\
+$e$ & lateral error at CG (m)\\
+$\Delta U_x$ & longitudinal vehicle velocity error (m/s)\\
+$a_x$ & longitudinal acceleration (m/$s^2$)\\
+$a_y$ & lateral acceleration (m/$s^2$)\\
 \end{longtable*}}
 
 \section{Introduction}
 In the world of controllers, one of the most interesting topics is the topic of path tracking for autonomous vehicles. The objective is to be able to follow a predetermined trajectory and speed profile as closely as possible, using sensors to gather information and a controller and actuators to determine required steering angle and acceleration. There exist several controller types which effectively serve this purpose, each of which undoubtedly requires some degree of tuning and optimisation, there are no off-the-shelf controllers that work for all problems. 
 
-It is the role of control engineers to determine the appropriate parameters (gains) that allow the controller to complete its task effectively. In the past, engineers would be required to generate several control diagram plots including Root-Locus, Nyquist, and Bode, all of which would provide them with a general idea as to what gains should be tested. The issue however, is that the t
+It is the role of control engineers to determine the appropriate parameters (gains) that allow the controller to complete its task effectively. In the past, engineers would be required to generate several control diagram plots including Root-Locus, Nyquist, and Bode, all of which would provide them with a general idea as to what gains should be tested. The typical process for testing and validation of controllers in the physical world can be time consuming and expensive, placing a strong emphasis on the design of an accurate and robust controller before implementation.
 
-With the advent of engineering design optimization algorithms and software, computational power can be used to predict
+With the advent of numerical modeling and simulation, engineers are now able to test and develop their designs in the virtual world at much lower costs. Engineers can iterate through their design parameters hundreds of thousands of times per minute, track improvement in their designs, and finally select the optimal solution to the problem. Furthermore, the computational power of modern machines allow for advanced analysis of large data sets revealing hidden trends in the data that otherwise would go unnoticed.
+
+\section{Vehicle Dynamics and Control Theory}
 
 \section{Optimization Approach}
+This paper looks at the iterative design approach for a Look-Ahead controller. The objective of this paper is to develop a robust algorithm that can use an existing data set containing design variables $\textbf{x} \in \mathbb{R}^3$:
+\begin{center}
+[$K_{LA}$    $x_{LA}$  $K_{long}$]
+ \end{center}
+and their respective simulation results f($\textbf{x}$) $\in \mathbb{R}^4$:
+ \begin{center}
+[$e$    $\Delta U_{x}$  $a_y$   $a_x$]
+ \end{center}
+ to accurately predict the results for any given $\textbf{x}$. Once this regression model has been established it is then possible to optimise the for the ideal design variable $x^*$. The optimization problem is formally stated as:\\
+\begin{equation}
+\begin{aligned}
+\min_{x} \quad & f_{obj}(\textbf{x})\\
+\textrm{subject to} \quad &\ e\leq0.20 \\
+& \Delta U_{x}\leq0.75 \\
+& |a_{x}|\leq4 \\
+& |a_{y}|\leq4 \\
+\end{aligned}
+\end{equation}
+The resulting $x^*$ containing the ideal controller gains is then tested in the virtual MATLAB simulation environment and the results are collected and compared against the existing data-set to measure improvement on the existing data samples.
 
 \subsection{Cost Function}
 
