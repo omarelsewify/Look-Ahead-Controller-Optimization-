@@ -30,6 +30,12 @@ Several optimization approaches are considered and performance of the algorithms
 $K_{LA}$ & look-ahead gain \\
 $x_{LA}$ & look-ahead distance (m)\\
 $K_{long}$& longitudinal gain \\
+$\delta$ & steering angle (rad)\\
+$F_{x}$ & longitudinal force (N) \\
+$e$ & lateral error at CG (m)\\
+$\Delta U_x$ & longitudinal vehicle velocity error (m/s)\\
+$a_x$ & longitudinal acceleration (m/$s^2$)\\
+$a_y$ & lateral acceleration (m/$s^2$)\\
 $x$ & design variable \\
 $f$ & general function \\
 $f_{obj}$   & objective function\\
@@ -37,10 +43,6 @@ $c$  & constraints \\
 $\alpha$ & step size\\
 $\rho$   & initial penalty \\
 $\gamma$ & penalty multiplier\\
-$e$ & lateral error at CG (m)\\
-$\Delta U_x$ & longitudinal vehicle velocity error (m/s)\\
-$a_x$ & longitudinal acceleration (m/$s^2$)\\
-$a_y$ & lateral acceleration (m/$s^2$)\\
 \end{longtable*}}
 
 \section{Introduction}
@@ -51,17 +53,49 @@ It is the role of control engineers to determine the appropriate parameters (gai
 With the advent of numerical modeling and simulation, engineers are now able to test and develop their designs in the virtual world at much lower costs. Engineers can iterate through their design parameters hundreds of thousands of times per minute, track improvement in their designs, and finally select the optimal solution to the problem. Furthermore, the computational power of modern machines allow for advanced analysis of large data sets revealing hidden trends in the data that otherwise would go unnoticed.
 
 \section{Vehicle Dynamics and Control Theory}
+An ideal controller is designed around two requirements: integrated longitudinal and lateral control, and robustness against noisy inputs \cite{bayuwindra2019look}. The lateral control part of the look-ahead controller takes instantaneous heading error $\Delta\psi$, lateral error $e$, and longitudinal velocity $U_x$ as inputs and returns a steering angle $\delta$ which will point the vehicle towards the path. This relationship can be summarised by the following equation:
+\[\Delta\psi_{ss}=\kappa(\frac{maU_x^2}{LC_{{\alpha}r}}-b)\]
+\[\delta_{ff}=\frac{K_{LA}x_{LA}}{C_{{\alpha}f}}\Delta\psi_{ss} + \kappa(L+KU_x^2)\]
+\[\delta=-\frac{K_{LA}}{C_{{\alpha}f}}(e+x_{LA}\Delta\psi)+\delta_{ff}\]
+
+The second part of the controller involves the control of longitudinal velocity $U_x$, the equivalent of pressing the accelerator pedal.
+
+\begin{figure}[hbt!]
+\centering
+\includegraphics[width=0.75\textwidth]{lookahead_fb}
+\caption{Block diagram of the look-ahead controller with integrated longitudinal velocity feedback control\cite{bayuwindra2019look}}
+\end{figure}
 
 \section{Optimization Approach}
 This paper looks at the iterative design approach for a Look-Ahead controller. The objective of this paper is to develop a robust algorithm that can use an existing data set containing design variables $\textbf{x} \in \mathbb{R}^3$:
 \begin{center}
-[$K_{LA}$    $x_{LA}$  $K_{long}$]
+\textbf{x} = [$K_{LA}$    $x_{LA}$  $K_{long}$]
  \end{center}
-and their respective simulation results f($\textbf{x}$) $\in \mathbb{R}^4$:
+and their respective simulation results $f($\textbf{x}$)$ $\in \mathbb{R}^4$
  \begin{center}
-[$e$    $\Delta U_{x}$  $a_y$   $a_x$]
+$f(\textbf{x})$ = [$e$    $\Delta U_{x}$  $a_y$   $a_x$]
  \end{center}
- to accurately predict the results for any given $\textbf{x}$. Once this regression model has been established it is then possible to optimise the for the ideal design variable $x^*$. The optimization problem is formally stated as:\\
+to accurately predict the results for any given $\textbf{x}$. Once this regression model for the function $f$ has been established it is then possible to optimise the for the ideal design variable $x^*$. 
+ 
+The resulting $x^*$ containing the ideal controller gains is then tested in the virtual MATLAB simulation environment and the results are collected and compared against the existing data-set to measure improvement on the existing data samples.
+
+\subsection{Constraints}
+
+There are four main design constraints \textbf{g}(\textbf{x)} imposed on this problem, the first of which is a constraint on the allowable lateral error $e$. The further the vehicle center of gravity is to the left or right of the desired trajectory the larger the error. As such it is best ensure that the lateral error is kept to a minimum, in this problem the allowable lateral error is 20 cm.
+\[e\leq0.20\]
+The second constraint is on the error in longitudinal velocity tracking $\Delta U_x$. The greater the deviation in the instantaneous velocity from the desired velocity on the speed profile the greater the magnitude of longitudinal velocity error. In this problem the maximum allowable $\Delta U_x$ is 0.75 m/s.
+\[\Delta U_x\leq0.75\]
+Furthermore, both the maximum lateral and longitudinal accelerations are constrained, such as to reduce the jerkiness motion of the vehicle. A reasonable value of 4 $m/s^2$ is selected for this problem. This constraint is imposed on both the negative (braking) and positive (accelerating) acceleration directions.
+\[|a_x|\leq4\]
+\[|a_y|\leq4\]
+
+\subsection{Cost Function}
+
+The cost function designed for this problem is designed with the objective of reducing $e$ and $\Delta U_x$ while minimizing $a_x$ and $a_y$ such as to reduce the jerkiness motion experienced by the passengers. However, these requirements are not equally weighted, it is more important to ensure the vehicle follows the trajectory than ensuring comfortable ride. This in turn must be represented in the objective function.
+\[p_{qaudratic}(\textbf{x}) = \Sigma \theta_i max(g_i(x),0)^2\]
+\[f_{obj}(\textbf{x}) = \sum_{i=1}^{4} f_i(\textbf{x}) + p_{qaudratic}(\textbf{x})\]
+
+The optimization problem is formally stated as:
 \begin{equation}
 \begin{aligned}
 \min_{x} \quad & f_{obj}(\textbf{x})\\
@@ -71,15 +105,6 @@ and their respective simulation results f($\textbf{x}$) $\in \mathbb{R}^4$:
 & |a_{y}|\leq4 \\
 \end{aligned}
 \end{equation}
-The resulting $x^*$ containing the ideal controller gains is then tested in the virtual MATLAB simulation environment and the results are collected and compared against the existing data-set to measure improvement on the existing data samples.
-
-\subsection{Cost Function}
-
-All manuscripts are to be submitted electronically to the ScholarOne Abstracts site created for each conference. The manuscript upload will be enabled several weeks after acceptance notices have been sent. Presenting authors of accepted papers will receive an email with instructions when manuscript submission is open. It is important that presenting authors keep their email addresses up-to- date so they do not miss this notice.
-
-\subsection{Constraints}
-
-Before completing manuscript submission, submitters must also select the copyright statement that will appear on the paper, and complete other acknowledgments. It is also necessary to click both the ``Accept'' and ``Save'' buttons to complete a submission. All completed manuscript submission will be confirmed by email. Completed submissions will also have a status of ``Accepted'' at the top of your manuscript submission page.
 
 \subsection{Optimization Algorithm}
 
