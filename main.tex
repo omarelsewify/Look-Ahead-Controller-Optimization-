@@ -10,6 +10,8 @@
 \setlength\LTleft{0pt} 
 \usepackage{multirow}
 \usepackage{float}
+\usepackage{pgfplots}
+\usepackage{tikz}
 
 
 \title{Optimization of Look-Ahead controller gains for simulation of autonomous vehicle path-tracking}
@@ -35,6 +37,7 @@ $x_{LA}$ & look-ahead distance (m)\\
 $K_{long}$& longitudinal gain \\
 $\delta$ & steering angle (rad)\\
 $F_{x}$ & longitudinal force (N) \\
+$\Delta\psi_{ss}$& heading error \\
 $e$ & lateral error at CG (m)\\
 $\Delta U_x$ & longitudinal vehicle velocity error (m/s)\\
 $a_x$ & longitudinal acceleration (m/$s^2$)\\
@@ -47,6 +50,7 @@ $\alpha$ & step size\\
 $\rho$   & initial penalty \\
 $\gamma$ & penalty multiplier\\
 \end{longtable*}}
+$\psi$& radial basis function \\
 
 \section{Introduction}
 In the world of controllers, one of the most interesting topics is the topic of path tracking for autonomous vehicles. The objective is to be able to follow a predetermined trajectory and speed profile as closely as possible, using sensors to gather information and a controller and actuators to determine required steering angle and acceleration. There exist several controller types which effectively serve this purpose, each of which undoubtedly requires some degree of tuning and optimisation, there are no off-the-shelf controllers that work for all problems. 
@@ -91,7 +95,17 @@ The second constraint is on the error in longitudinal velocity tracking $\Delta 
 Furthermore, both the maximum lateral and longitudinal accelerations are constrained, such as to reduce the jerkiness motion of the vehicle. A reasonable value of 4 $m/s^2$ is selected for this problem. This constraint is imposed on both the negative (braking) and positive (accelerating) acceleration directions.
 \[|a_y|\leq4\]
 \[|a_x|\leq4\]
-
+These desired constraints on the acceleration profile are illustrated in Figure \ref{fig:des-acc-profile}
+\begin{figure}[htb]
+    \begin{center}
+        \vspace{-35mm}
+        \includegraphics[width =0.6\textwidth]{Desired_Profiles.pdf}
+        \vspace{-35mm}
+        \caption{Desired speed profile $U_x$ and acceleration profiles for $a_x$ and $a_y$}
+        \label{fig:des-acc-profile}
+    \end{center}
+\end{figure}
+\vspace{-10mm}
 \subsection{Cost Function}
 
 The cost function designed for this problem is designed with the objective of reducing $e$ and $\Delta U_x$ while minimizing $a_x$ and $a_y$. However, these requirements are not equally weighted, it is more important to ensure the vehicle follows the trajectory than ensuring a comfortable ride. As such as a weighted quadratic penalty function is deployed. For this application a strong emphasis of 10 to 1 is placed on staying within the constraints of lateral and longitudinal velocity error compared to acceleration restriction.
@@ -115,12 +129,24 @@ The optimization problem is formally stated as:
 \subsection{Function Fitting} % Radial basis functions
 In order to fit an accurate model to the data samples at hand, three different function-based models are compared. The goal is to obtain a model that best represents the actual objective function. These types of models are referred to as surrogate models \cite{kochenderfer2019algorithms}.  
 
-For this problem, radial basis functions are used, which are a type of function whose value depends on its distance from the origin. Essentially, the function's response increases or decreases uniformly with distance from a central point \cite{orr1996introduction}. 
+For this problem, radial basis functions are used, which are a type of function whose value depends on its distance from the origin. Essentially, the function's response increases or decreases uniformly with distance from a central point c \cite{orr1996introduction}. 
 
-A radial fun
+A radial function \[\psi\] can be written as follows:
+\[\psi{x,c}=\psi{mod(x-c)}=\psi{r}\]
+
+
+%ψ(x,c) =ψ(‖x−c‖) =ψ(r)
 These types of functions are a favorable choice due to their simplistic design, ease of training, and flexibility.  They also result in very stable models that can represent the data set accurately as a result of their tolerance for input noise \cite{yu2011advantages}.
 
-compares the closeness of the models to the true objective function.  
+\subsubsection{Linear Radial Functions}
+
+
+\subsubsection{Gaussian Radial Functions}
+
+
+\subsubsection{Inverse Radial Functions}
+
+
 
 \subsection{Training and Validation} % Cross-validation vs bootstrap
 To make sure that the model fit selected is optimal we need to employ a validation method which returns the generalization error for each surrogate model. The generalization error measures the error of the model on the full design space including points that were not used to train the model. In this paper the expected squared error metric is used to calculate the generalization error:
@@ -131,10 +157,12 @@ with $n$ representing the number of data point in the test set.
 The k-fold cross-validation method splits the available data set $X$ in to k randomly partitioned sets of approximately equal size. In each iteration of the method one set is withdrawn for testing and k-1 sets are used to train the model. The withdrawn set is then used to calculate the generalization error of that trained model. By the end of the algorithm k models are trained and k generalization errors are collected. The mean of the generalization is then calculated representing the expected $\epsilon_{gen}$ of the function.
 
 \subsubsection{Bootstrap method}
-
+The limitation of the k-fold cross-validation method is that the testing is done a small fraction of the entire data set increasing the likelihood of bias within the validation process. Bootstrap method addresses this by testing on the entire data set $X$, by training the model on several "synthetic" data sets created by random sampling of the original data set with replacement.
 
 \subsection{Optimization Algorithm} % Hooke-Jeeves vs Cross Entropy
+\label{section:Optimization Algorithm}
 In this paper two optimization algorithms are examined, the Hook-Jeeves method and the Cross-Entropy method.The results of both algorithms are compared and evaluated to determine the optimal approach/model for the problem.
+
 \subsubsection{Hooke-Jeeves}
 The Hooke-Jeeves method is a direct method that takes small steps in each design point coordinate direction. At every iteration the method compares the cost function at anchoring design point \textbf{x} and the cost function at $f(\textbf{x}\pm\alpha \textbf{e}^{(i)})$ for a given step size $\alpha$ in every direction from \textbf{x}, and accepts any improvement found. If no improvements are made then the step size is decreased by a factor of $\gamma$ \cite{kochenderfer2019algorithms}.
 However, the performance/suitability of this step size addition and subtraction approach is limited in regards to this problem because the range of magnitudes of each of the design variables is significantly wide. $K_{LA}$ values typically are of the magnitude of $10^3$, $x_LA$ is typically in the range of $10^1$ while $K_{long}$ is typically around $10^{-1}$. This wide range means that a small step size in one variable will  either be too small or too large of a step in another variable. An alternative approach derived from Hooke-Jeeves is deployed in this problem. Instead of using a scalar step change in the design variables, a proportional step change is deployed. Now the objective function is evaluated at $f(\textbf{x}\pm\alpha \textbf{x}^{(i)})$ and compared to the anchor point objective function value. The remaining steps remain the same as Hooke-Jeeves.
@@ -165,19 +193,106 @@ The starting point of the optimization approach involved the determination of an
  \hline
   Predictor &Linear & Gaussian & Inverse & Linear & Gaussian & Inverse \\ [0.5ex] 
  \hline
- $e$ & 0.48 & 0.90 & 1.05 & 1 & 6 & 87837\\
+ $e$ & 0.01 & 0.03 & 0.02 & 0.01 & 0.03 & 0.02\\
  \hline
- $\Delta U_x$ & 19.58 & 40.25 & 41.09 & 1 & 6 & 87837\\
+ $\Delta U_x$ & 0.22 & 4.93 & 2.60 & 0.22 & 5.79 & 2.4\\
  \hline
- $a_y$ & 5.37 & 13.34 & 12.51 & 1 & 6 & 87837\\
+ $a_y$ & 0.55 & 3.60 & 2.72 & 0.52 & 4.08 & 2.45\\
  \hline
- $a_x$ & 2.24 & 4.69 & 5.14 & 1 & 6 & 87837\\ [0.5ex] 
+ $a_x$ & 0.81 & 1.53 & 1.44 & 0.81 & 1.50 & 1.40\\ [0.5ex] 
  \hline
 \end{tabular}
+\vspace{2.5mm}
 \caption{\label{tab:cv_bs_rbf}Comparison of generalisation errors generated from cross-validation and bootstrap for each radial basis function and predictor function.}
 \end{table}
+\vspace{-10mm}
+
+% Comment on how linear was actually a poor representation when tested
 
 \subsection{Optimal algorithm selection}
+This section compares the two optimisation method mentioned in Section~\ref{section:Optimization Algorithm}. The evolution of each the design point variables (Look-Ahead Gains) is plotted for both methods and the final optimal solution is simulated in the MATLAB environment to return the lateral error $e$ profile and the acceleration profiles $a_x$ and $a_y$.
+
+\subsubsection{Look-ahead Gain}
+In both cases the look ahead gain converges to roughly the same value of 2620. However, the path that the two algorithms take to reach this value are very different, the two trajectories are plotted in Figure \ref{fig:k_la_evo}. 
+With cross-entropy the look-ahead evolution follows a curved trajectory where each iteration leads to a decrease in the gain value until the value plateaus at which point the algorithm stops. 
+On the other hand, the Hooke-Jeeves method only changes the variable when an improvement is found, so the $K_{LA}$ profile remains flat until a large step change improvement is found after roughly 145 iterations that reduce $K_{LA}$ by 0.2\%. The reason it takes such a long time to find an improvement is because the initial percentage step size $\alpha$ is large compared to the other design point variables, this was intentionally done to accommodate the very small magnitude of $K_{long}$. As such the initial percentage step changes are too large to find an improvement in $K_{LA}$. Eventually, once the percentage step change is small enough to find an improvement, an attenuating behaviour is observed. 
+
+\begin{figure}[H]
+    \begin{center}
+        \vspace{-2.5mm}
+        \resizebox{0.6\textwidth}{!}{\input{k_la.pgf}}
+        \vspace{-7.5mm}
+    \end{center}
+    \caption{Iterative evolution of $K_{LA}$ using Cross-Entropy and Hooke-Jeeves method}
+    \label{fig:k_la_evo}
+\end{figure}
+
+It is noted here that the Hooke-Jeeves method was able to reach convergence in roughly 20 fewer iterations than Cross-Entropy.
+
+\subsubsection{Look-ahead Distance}
+The evolution of the look-ahead distance is plotted in Figure \ref{fig:x_la_evo}, and shows that the two methods converge near the same value of 9.40 m. The noisiness observed in evolution profile observed for Cross-Entropy can be explained by the iterative exploration of the design space using a changing proposal distribution. As a result, the mean value will oscillate slightly as different points are being considered in each adjacent iteration. The initial flatness observed in the Hooke-Jeeves profile, until around 125 iterations, is again a result of the difference in magnitude of $x_{LA}$ compared to $K_{long}$. This difference in the number of iterations required to observe a change in $x_{LA}$ compared to $K_{LA}$ is explained by the slightly smaller magnitude of $x_{LA}$ leading to earlier large percentage step changes being more effective.
+
+\begin{figure}[H]
+    \begin{center}
+        \vspace{-2.5mm}
+        \resizebox{0.6\textwidth}{!}{\input{x_la.pgf}}
+        \vspace{-7.5mm}
+    \end{center}
+    \caption{Iterative evolution of $x_{LA}$ using Cross-Entropy and Hooke-Jeeves method}
+    \label{fig:x_la_evo}
+\end{figure}
+
+Once again it is noted Hooke-Jeeves is reaches convergence roughly 20 iterations faster than Cross-Entropy.
+
+\subsubsection{Longitudinal Gain}
+
+Finally, the evolution of $K_{long}$ is plotted in Figure \ref{fig:k_long_evo}. Convergence of the two algorithms is again observed with the final values of convergence lying around 0.18. 
+
+\begin{figure}[H]
+    \begin{center}
+        \vspace{-2.5mm}
+        \resizebox{0.6\textwidth}{!}{\input{k_long.pgf}}
+        \vspace{-7.5mm}
+    \end{center}
+    \caption{Iterative evolution of $K_{long}$ using Cross-Entropy and Hooke-Jeeves method}
+    \label{fig:k_long_evo}
+\end{figure}
+
+\subsubsection{Objective Function Minimisation}
+
+\begin{figure}[H]
+    \begin{center}
+        \vspace{-2.5mm}
+        \resizebox{0.6\textwidth}{!}{\input{objective_function.pgf}}
+        \vspace{-7.5mm}
+    \end{center}
+    \caption{Iterative evolution of $f_{obj}(\textbf{x})$ using Cross-Entropy and Hooke-Jeeves method}
+    \label{fig:k_long_evo}
+\end{figure}
+
+\subsubsection{Simulated results for $x^*$}
+
+\begin{figure}[H]
+    \begin{center}
+        \vspace{-2.5mm}
+        \includegraphics[width =0.6\textwidth]{e_Profile.pdf}
+        \vspace{-7.5mm}
+        \caption{Simulation of optimal design point $x^*$ for lateral error vs time}
+        \label{fig:e-profile}
+    \end{center}
+\end{figure}
+
+\begin{figure}[H]
+    \begin{center}
+        \vspace{-2.5mm}
+        \includegraphics[width =0.6\textwidth]{Acceleration_Profiles.pdf}
+        \vspace{-7.5mm}
+        \caption{Simulation of optimal design point $x^*$ for longitudinal and lateral accelerations vs time}
+        \label{fig:acc-profile}
+    \end{center}
+\end{figure}
+
+The simulation results in figure 7 above show that the lateral error profile fell nearly perfectly within the set constraint, only to slightly exceed the constraint value of 0.2 m at around 14 seconds.
 
 \subsection{Optimal design point simulation results}
 
